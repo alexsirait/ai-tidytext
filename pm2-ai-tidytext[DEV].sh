@@ -11,7 +11,7 @@ APP_FILE="main.py"  # Ganti ini kalau file utamamu bukan main.py
 APP_MODULE="main:app"  # Format: nama_file:variabel_app (tanpa .py)
 
 # Aktivasi virtual environment
-source "$VENV_DIR/bin/activate"
+source "$VENV_DIR/Scripts/activate"
 
 # Pindah ke direktori aplikasi (opsional tapi biasanya aman)
 cd "$APP_DIR"
