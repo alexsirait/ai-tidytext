@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, validator
-import google.generativeai as genai
+from openai import AsyncOpenAI
 import os
 import time
 import json
@@ -17,7 +17,7 @@ load_dotenv()
 # Initialize FastAPI app
 app = FastAPI(
     title="Text Tidy API",
-    description="API for refining and translating text using Google's Gemini AI",
+    description="API for refining and translating text using OpenAI",
     version="1.0.0"
 )
 
@@ -31,16 +31,16 @@ app.add_middleware(
 )
 
 # Get API key from environment variable
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY environment variable is not set")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    raise ValueError("OPENAI_API_KEY environment variable is not set")
 
-# Configure Gemini API
-genai.configure(api_key=GEMINI_API_KEY)
+# Initialize OpenAI client
+client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
 # Request rate limiting
 RATE_LIMIT = 10  # requests per minute
-rate_limit_dict: Dict[str, list] = {}
+rate_limit_dict: Dict[str, List[float]] = {}
 
 # Input and output models
 class TextInput(BaseModel):
@@ -98,8 +98,8 @@ async def rate_limit_middleware(request: Request, call_next):
 
 app.middleware("http")(rate_limit_middleware)
 
-# Process text with Gemini API
-async def process_text_with_gemini(input_text: str, language: str = "en", analysis_type: str = "comprehensive") -> Dict[str, Any]:
+# Process text with OpenAI API
+async def process_text_with_openai(input_text: str, language: str = "en", analysis_type: str = "comprehensive") -> Dict[str, Any]:
     start_time = time.time()
     
     # Check cache first
@@ -109,9 +109,6 @@ async def process_text_with_gemini(input_text: str, language: str = "en", analys
         return cached_result
     
     try:
-        # Initialize Gemini model
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        
         # Enhanced prompt based on analysis type
         if analysis_type == "comprehensive":
             prompt = f"""
@@ -206,16 +203,23 @@ async def process_text_with_gemini(input_text: str, language: str = "en", analys
         
         # Generate content with timeout
         response = await asyncio.wait_for(
-            asyncio.to_thread(model.generate_content, prompt),
+            client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "You are a helpful AI assistant."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=1500,
+                temperature=0.7
+            ),
             timeout=30.0
         )
         
-        result = response.text.strip()
+        result = response.choices[0].message.content.strip()
         
-        # For comprehensive analysis, try to extract structured data
+        # For comprehensive analysis, extract structured data
         if analysis_type in ["comprehensive", "all"]:
             try:
-                # Try to extract structured data from the response
                 structured_data = {
                     "main_content": "",
                     "key_points": [],
@@ -224,30 +228,40 @@ async def process_text_with_gemini(input_text: str, language: str = "en", analys
                     "related_topics": []
                 }
                 
-                # Simple parsing logic - in a real app, you might use more sophisticated NLP
-                sections = result.split("\n\n")
+                # Split by section headers (###)
+                sections = result.split("###")[1:]  # Skip the first empty split if any
                 current_section = None
                 
                 for section in sections:
-                    if "Main Content:" in section or "Refined Text:" in section:
+                    section = section.strip()
+                    if not section:
+                        continue
+                    
+                    # Identify the section by its header
+                    if section.startswith("Main Content") or section.startswith("Refined Text"):
                         current_section = "main_content"
-                        structured_data["main_content"] = section.split(":", 1)[1].strip()
-                    elif "Key Points:" in section:
+                        # Extract content after the header
+                        content = section.split("\n", 1)[1].strip() if "\n" in section else ""
+                        structured_data["main_content"] = content
+                    elif section.startswith("Key Points"):
                         current_section = "key_points"
-                        points_text = section.split(":", 1)[1].strip()
-                        structured_data["key_points"] = [p.strip() for p in points_text.split("\n") if p.strip()]
-                    elif "Context:" in section:
+                        # Extract points after the header
+                        points_text = section.split("\n", 1)[1].strip() if "\n" in section else ""
+                        structured_data["key_points"] = [p.strip() for p in points_text.split("\n") if p.strip() and p.strip()[0].isdigit()]
+                    elif section.startswith("Context"):
                         current_section = "context"
-                        structured_data["context"] = section.split(":", 1)[1].strip()
-                    elif "Implications:" in section:
+                        content = section.split("\n", 1)[1].strip() if "\n" in section else ""
+                        structured_data["context"] = content
+                    elif section.startswith("Implications"):
                         current_section = "implications"
-                        structured_data["implications"] = section.split(":", 1)[1].strip()
-                    elif "Related Topics:" in section:
+                        content = section.split("\n", 1)[1].strip() if "\n" in section else ""
+                        structured_data["implications"] = content
+                    elif section.startswith("Related Topics"):
                         current_section = "related_topics"
-                        topics_text = section.split(":", 1)[1].strip()
-                        structured_data["related_topics"] = [t.strip() for t in topics_text.split("\n") if t.strip()]
+                        topics_text = section.split("\n", 1)[1].strip() if "\n" in section else ""
+                        structured_data["related_topics"] = [t.strip() for t in topics_text.split("\n") if t.strip() and t.strip()[0].isdigit()]
                     elif current_section and section.strip():
-                        # Append to current section if we're in the middle of one
+                        # Append to current section if no new header
                         if current_section == "main_content":
                             structured_data["main_content"] += "\n" + section
                         elif current_section == "context":
@@ -259,8 +273,8 @@ async def process_text_with_gemini(input_text: str, language: str = "en", analys
                     "text": result,
                     "structured_data": structured_data
                 }
-            except Exception:
-                # If structured parsing fails, just return the text
+            except Exception as e:
+                print(f"Parsing error: {str(e)}")  # Debug log
                 return {"text": result}
         
         return {"text": result}
@@ -276,15 +290,15 @@ async def tidy_text(input: TextInput):
     try:
         start_time = time.time()
         
-        # Process text with Gemini API
-        result = await process_text_with_gemini(input.text, input.language, input.analysis_type)
+        # Process text with OpenAI API
+        result = await process_text_with_openai(input.text, input.language, input.analysis_type)
         
         processing_time = time.time() - start_time
         
         response_data = {
             "result": result["text"],
             "processing_time": processing_time,
-            "model_used": "gemini-1.5-flash"
+            "model_used": "gpt-4o"
         }
         
         # Add structured analysis if available
