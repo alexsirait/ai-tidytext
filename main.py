@@ -77,7 +77,7 @@ Input text {language}: {input_text}"""
         raise HTTPException(status_code=500, detail=f"Error processing text: {str(e)}")
 
 # API endpoint
-@app.post("/tidy-text/")
+@app.post("api/tidy-text/")
 async def tidy_text(input: TextInput):
     try:
         start_time = time.time()
