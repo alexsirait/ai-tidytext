@@ -131,40 +131,51 @@ async def project_overview(input: TextInput):
                 "project_progress": p.get("project_progress", 0),
                 "start_date" : p.get("start_date", "-"),
                 "end_date": p.get("end_date", "-"),
+                "department_name": p.get("department_name", "-"),
             }
             for p in projects
         ]
+        # return {"result":filtered_projects }
 
         project_info = ""
         for idx, p in enumerate(filtered_projects, start=1):
             project_info += (
                 f"{idx}. *{p['title']}*\n"
                 f"   • Status: {p['project_status']}\n"
+                f"   • Stakeholder: {p['department_name']}\n"
                 f"   • Start Date: {p['start_date']}\n"
-                f"   • End Date: {p['end_date']}\n"                
+                f"   • Target End: {p['end_date']}\n"                
                 f"   • Progress Status: {p['project_progress_status']}\n"
                 f"   • Progress: {p['project_progress']}%\n\n"
 
             )
+        
+        # return {"result":project_info }
 
         prompt_template = (
             "Project Overview Instructions:\n"
-            "- Below is a list of project details.\n"
-            "- Extract key project information based on the user's question.\n"
-            "- Identify the project name from the question (e.g., 'meeting room') and match it to the project data.\n"
-            "- Identify the project name or category from the user's question (e.g., 'meeting room', 'ai cob') and match it to the project data as closely as possible.\n"
-            "- Perform a substring match: If the user's question contains part of a project name (e.g., 'ai cob', 'COB Battery'), find the most relevant project even if the name isn't exact.\n"
-            "- Keep the response natural and clear: avoid technical phrases like 'Based on the user's question...' or 'Found projects...'. Simply answer the question directly and clearly.\n"
-            "- If the project is found, return the progress details clearly.\n"
-            "- Show all with same character (e.g., 'meeting room') and show all in the project data.\n"
-            "- Keep your response concise and informative, highlighting the most important aspects.\n"
-            "- You can answer all language\n"
-            "- Thinking deep what user want to talk\n"
-            "- If the project is not found, return a response saying the project was not found.\n\n"
+            "\n"
+            "Your task is to answer the user's question based on the available project data. Follow these guidelines:\n"
+            "\n"
+            "1. Understand the intent of the user's question. It may refer to a project name, topic, or category (e.g., 'AI', 'meeting room', or 'mobile app').\n"
+            "2. Identify the project name or category mentioned in the question and match it to the project data as closely as possible.\n"
+            "3. Use substring matching: Even if the project name in the question is only partially mentioned (e.g., 'ai cob', 'COB Battery'), you should still find the most relevant project(s).\n"
+            "4. If multiple relevant projects are found, display all of them in a clean and consistent format.\n"
+            "5. If the user's question asks about the number of projects (e.g., 'how many AI projects?'), respond with the total count and list a few relevant examples.\n"
+            "6. For each project shown, use the following format:\n"
+            "   • Status: <status>\n"
+            "   • Stakeholder: <stakeholder>\n"
+            "   • Start Date: <start date>\n"
+            "   • Target End: <end date>\n"
+            "   • Progress Status: <progress status>\n"
+            "   • Progress: <percentage>\n"
+            "7. Avoid technical phrases like 'based on the user's question' or 'the matched project is'. Answer naturally and clearly, as if you're having a human conversation.\n"
+            "8. Respond in the same language used in the question.\n"
+            "9. If no relevant project is found, simply reply with: 'Sorry, no relevant project found.'\n"
+            "\n"
             "User Question:\n{user_question}\n\n"
             "Project Data:\n{project_info}"
         )
-
 
         start_time = time.time()
         prompt = prompt_template.format(user_question=input.text, project_info=project_info )
@@ -229,6 +240,7 @@ async def project_overview(
                 "project_progress": p.get("project_progress", 0),
                 "start_date" : p.get("start_date", "-"),
                 "end_date": p.get("end_date", "-"),
+                "department_name": p.get("department_name", "-"),
             }
             for p in projects
         ]
@@ -238,6 +250,7 @@ async def project_overview(
             project_info += (
                 f"{idx}. *{p['title']}*\n"
                 f"   • Status: {p['project_status']}\n"
+                f"   • Stakeholder: {p['department_name']}\n"
                 f"   • Start Date: {p['start_date']}\n"
                 f"   • End Date: {p['end_date']}\n"                
                 f"   • Progress Status: {p['project_progress_status']}\n"
