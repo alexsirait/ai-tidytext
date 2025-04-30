@@ -158,6 +158,8 @@ async def project_overview(input: TextInput):
             "- If the project is found, return the progress details clearly.\n"
             "- Show all with same character (e.g., 'meeting room') and show all in the project data.\n"
             "- Keep your response concise and informative, highlighting the most important aspects.\n"
+            "- You can answer all language\n"
+            "- Thinking deep what user want to talk\n"
             "- If the project is not found, return a response saying the project was not found.\n\n"
             "User Question:\n{user_question}\n\n"
             "Project Data:\n{project_info}"
