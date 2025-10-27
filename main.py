@@ -110,7 +110,7 @@ async def process_text_with_gemini(input_text: str, language: str = "en", analys
     
     try:
         # Initialize Gemini model
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         # Enhanced prompt based on analysis type
         if analysis_type == "comprehensive":
@@ -284,7 +284,7 @@ async def tidy_text(input: TextInput):
         response_data = {
             "result": result["text"],
             "processing_time": processing_time,
-            "model_used": "gemini-1.5-flash"
+            "model_used": "gemini-2.5-flash"
         }
         
         # Add structured analysis if available
